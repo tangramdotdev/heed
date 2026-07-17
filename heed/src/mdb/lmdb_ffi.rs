@@ -10,6 +10,8 @@ pub use ffi::{
     mdb_txn_commit, mdb_txn_id, mdb_version, MDB_cursor, MDB_dbi, MDB_env, MDB_envinfo, MDB_stat,
     MDB_txn, MDB_val, MDB_CP_COMPACT, MDB_CURRENT, MDB_RDONLY, MDB_RESERVE,
 };
+#[cfg(all(not(master3), feature = "posix-sem"))]
+pub use ffi::mdb_env_set_semaphore_name;
 #[cfg(master3)]
 pub use ffi::{mdb_env_set_encrypt, MDB_enc_func};
 #[cfg(master3)]

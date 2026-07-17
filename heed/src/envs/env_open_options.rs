@@ -30,6 +30,8 @@ pub struct EnvOpenOptions<T: TlsUsage = WithTls> {
     map_size: Option<usize>,
     max_readers: Option<u32>,
     max_dbs: Option<u32>,
+    #[cfg(feature = "posix-sem")]
+    semaphore_name: Option<String>,
     flags: EnvFlags,
     _tls_marker: PhantomData<T>,
 }
@@ -41,6 +43,8 @@ impl EnvOpenOptions<WithTls> {
             map_size: None,
             max_readers: None,
             max_dbs: None,
+            #[cfg(feature = "posix-sem")]
+            semaphore_name: None,
             flags: EnvFlags::empty(),
             _tls_marker: PhantomData,
         }
@@ -80,8 +84,24 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// # Ok(()) }
     /// ```
     pub fn read_txn_with_tls(self) -> EnvOpenOptions<WithTls> {
-        let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
-        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
+        let Self {
+            map_size,
+            max_readers,
+            max_dbs,
+            #[cfg(feature = "posix-sem")]
+            semaphore_name,
+            flags,
+            _tls_marker: _,
+        } = self;
+        EnvOpenOptions {
+            map_size,
+            max_readers,
+            max_dbs,
+            #[cfg(feature = "posix-sem")]
+            semaphore_name,
+            flags,
+            _tls_marker: PhantomData,
+        }
     }
 
     /// Make the read transactions `Send` by specifying they will
@@ -125,8 +145,24 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// # Ok(()) }
     /// ```
     pub fn read_txn_without_tls(self) -> EnvOpenOptions<WithoutTls> {
-        let Self { map_size, max_readers, max_dbs, flags, _tls_marker: _ } = self;
-        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker: PhantomData }
+        let Self {
+            map_size,
+            max_readers,
+            max_dbs,
+            #[cfg(feature = "posix-sem")]
+            semaphore_name,
+            flags,
+            _tls_marker: _,
+        } = self;
+        EnvOpenOptions {
+            map_size,
+            max_readers,
+            max_dbs,
+            #[cfg(feature = "posix-sem")]
+            semaphore_name,
+            flags,
+            _tls_marker: PhantomData,
+        }
     }
 
     /// Set the size of the memory map to use for this environment.
@@ -146,6 +182,27 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
     /// Set the maximum number of named databases for the environment.
     pub fn max_dbs(&mut self, dbs: u32) -> &mut Self {
         self.max_dbs = Some(dbs);
+        self
+    }
+
+    /// Set the base name of the POSIX semaphores used for locking.
+    ///
+    /// This is only effective when LMDB is built with POSIX semaphores (the
+    /// `posix-sem` feature, used on macOS). By default the lock semaphores are
+    /// named from a hash of the lock file's device and inode, which prevents
+    /// processes in different sandboxes from agreeing on a name. Setting an
+    /// explicit base name lets cooperating processes share the same semaphores;
+    /// scope it so that every process that shares the environment can open it,
+    /// for example by prefixing it with a macOS application group identifier.
+    ///
+    /// LMDB appends a single `r` or `w` character to the base name to form the
+    /// two semaphore names, so the base name plus one character must not exceed
+    /// the platform limit (31 characters on macOS).
+    ///
+    /// This method is only available when the `posix-sem` feature is enabled.
+    #[cfg(feature = "posix-sem")]
+    pub fn semaphore_name<S: Into<String>>(&mut self, name: S) -> &mut Self {
+        self.semaphore_name = Some(name.into());
         self
     }
 
@@ -455,6 +512,17 @@ impl<T: TlsUsage> EnvOpenOptions<T> {
                     mdb_result(ffi::mdb_env_set_maxdbs(env, dbs))?;
                 }
 
+                #[cfg(feature = "posix-sem")]
+                if let Some(name) = &self.semaphore_name {
+                    let name = CString::new(name.as_bytes()).map_err(|_| {
+                        Error::Io(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "the semaphore name contains a nul byte",
+                        ))
+                    })?;
+                    mdb_result(ffi::mdb_env_set_semaphore_name(env, name.as_ptr()))?;
+                }
+
                 // When the `<T as TlsUsage>::ENABLED` is true, we must tell
                 // LMDB to avoid using the thread local storage, this way we
                 // allow users to move RoTxn between threads safely.
@@ -488,7 +556,23 @@ impl Default for EnvOpenOptions<WithTls> {
 
 impl<T: TlsUsage> Clone for EnvOpenOptions<T> {
     fn clone(&self) -> Self {
-        let Self { map_size, max_readers, max_dbs, flags, _tls_marker } = *self;
-        EnvOpenOptions { map_size, max_readers, max_dbs, flags, _tls_marker }
+        let Self {
+            map_size,
+            max_readers,
+            max_dbs,
+            #[cfg(feature = "posix-sem")]
+            semaphore_name,
+            flags,
+            _tls_marker,
+        } = self;
+        EnvOpenOptions {
+            map_size: *map_size,
+            max_readers: *max_readers,
+            max_dbs: *max_dbs,
+            #[cfg(feature = "posix-sem")]
+            semaphore_name: semaphore_name.clone(),
+            flags: *flags,
+            _tls_marker: *_tls_marker,
+        }
     }
 }
