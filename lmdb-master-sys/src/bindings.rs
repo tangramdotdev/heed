@@ -274,6 +274,13 @@ extern "C" {
     pub fn mdb_env_set_maxdbs(env: *mut MDB_env, dbs: MDB_dbi) -> ::libc::c_int;
 }
 extern "C" {
+    #[doc = "Set the base name of the POSIX semaphores used for locking.\n\n This function is only effective when LMDB is built with MDB_USE_POSIX_SEM\n (for example on macOS). Setting an explicit base name lets cooperating\n processes share the same lock semaphores across sandboxes. LMDB appends a\n single 'r' or 'w' character to the base name, so the base name plus one\n character must not exceed the platform limit (31 characters on macOS). Pass\n NULL or an empty string to restore the default hash-derived names.\n\n This function may only be called after #mdb_env_create() and before #mdb_env_open().\n # Arguments\n\n* `env` (direction in) - An environment handle returned by #mdb_env_create()\n * `name` (direction in) - The semaphore base name, or NULL for the default\n # Returns\n\nA non-zero error value on failure and 0 on success."]
+    pub fn mdb_env_set_semaphore_name(
+        env: *mut MDB_env,
+        name: *const ::libc::c_char,
+    ) -> ::libc::c_int;
+}
+extern "C" {
     #[doc = "Get the maximum size of keys and #MDB_DUPSORT data we can write.\n\n Depends on the compile-time constant #MDB_MAXKEYSIZE. Default 511.\n See MDB_val.\n # Arguments\n\n* `env` (direction in) - An environment handle returned by #mdb_env_create()\n # Returns\n\nThe maximum size of a key we can write"]
     pub fn mdb_env_get_maxkeysize(env: *mut MDB_env) -> ::libc::c_int;
 }
