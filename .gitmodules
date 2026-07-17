@@ -1,6 +1,6 @@
 [submodule "lmdb-master-sys/lmdb"]
 	path = lmdb-master-sys/lmdb
-	url = https://github.com/meilisearch/lmdb.git
+	url = https://github.com/tangramdotdev/lmdb.git
 	branch = mdb.master.nested-rtxns
 [submodule "lmdb-master3-sys/lmdb"]
 	path = lmdb-master3-sys/lmdb
